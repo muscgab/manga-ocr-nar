@@ -1,3 +1,23 @@
+---
+license: cc-by-nc-sa-4.0
+language:
+- ja
+pipeline_tag: image-to-text
+tags:
+- ocr
+- manga
+- japanese
+- non-autoregressive
+- onnx
+- coreml
+datasets:
+- JustANormalTinkerer/animetext-ocr
+tasks:
+- ocr-recognition
+frameworks:
+- pytorch
+---
+
 # MangaOCR-Nar-Small
 
 [English](README.md) | [中文](README_zh.md)
