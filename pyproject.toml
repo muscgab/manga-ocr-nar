@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mangaocr-nar-small"
+version = "1.0.0"
+description = "Japanese manga text-box OCR, non-autoregressive, 54M parameters"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "Code: Apache-2.0; model weights: CC BY-NC-SA 4.0"}
+dependencies = ["numpy", "Pillow"]
+
+[project.optional-dependencies]
+cuda = ["torch>=2.1", "safetensors"]
+cpu = ["onnxruntime>=1.17"]
+mac = ["pyobjc-framework-CoreML>=10"]
+
+[project.scripts]
+mangaocr-nar-small = "mangaocr_nar_small.cli:main"
+
+[tool.setuptools]
+packages = ["mangaocr_nar_small", "mangaocr_nar_small.backends"]
