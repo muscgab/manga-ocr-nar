@@ -3,8 +3,8 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mangaocr-nar-small"
-version = "1.0.0"
+name = "manga-ocr-nar-small"
+version = "1.0.1"
 description = "Japanese manga text-box OCR, non-autoregressive, 54M parameters"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -17,7 +17,8 @@ cpu = ["onnxruntime>=1.17"]
 mac = ["pyobjc-framework-CoreML>=10"]
 
 [project.scripts]
-mangaocr-nar-small = "mangaocr_nar_small.cli:main"
+manga-ocr-nar-small = "manga_ocr_nar_small.cli:main"
+mangaocr-nar-small = "manga_ocr_nar_small.cli:main"   # old command name, kept after the 2026-10-14 rename
 
 [tool.setuptools]
-packages = ["mangaocr_nar_small", "mangaocr_nar_small.backends"]
+packages = ["manga_ocr_nar_small", "manga_ocr_nar_small.backends", "mangaocr_nar_small"]

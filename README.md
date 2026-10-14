@@ -2,7 +2,9 @@
 
 [English](README.md) | [中文](README_zh.md)
 
-[GitHub](https://github.com/muscgab/mangaocr-nar-small) (code and docs only, no weights) · [Hugging Face](https://huggingface.co/muscgab/mangaocr-nar-small) · [ModelScope](https://modelscope.cn/models/muscgab/mangaocr-nar-small)
+[GitHub](https://github.com/muscgab/manga-ocr-nar-small) (code and docs only, no weights) · [Hugging Face](https://huggingface.co/muscgab/manga-ocr-nar-small) · [ModelScope](https://modelscope.cn/models/muscgab/manga-ocr-nar-small)
+
+Renamed from `mangaocr-nar-small` on 2026-10-14. Old GitHub and Hugging Face links redirect here; the old ModelScope repository stays online. The old import name `mangaocr_nar_small` and command `mangaocr-nar-small` still work.
 
 OCR for Japanese manga text boxes. It takes one cropped text box and outputs the whole text in a single forward pass (non-autoregressive). 54.2M parameters.
 
@@ -146,7 +148,8 @@ $$m_j = b + \gamma_j \odot W_o f_j,\qquad f_j = \sum_{l=0}^{11} \mathrm{softmax}
 | `nar_vocabulary_6817.json` | Vocabulary | 48 KB |
 | `onnx/` | ONNX for CPU | 213 MB |
 | `coreml/` | CoreML for Mac | 107 MB |
-| `mangaocr_nar_small/` | Inference code | — |
+| `manga_ocr_nar_small/` | Inference code | — |
+| `mangaocr_nar_small/` | Old import name (alias of the above) | — |
 | `samples/` | Example crops | 162 KB |
 | `SHA256SUMS` | Checksums | — |
 
@@ -161,9 +164,9 @@ Download the full repository from Hugging Face or ModelScope (GitHub has no weig
 
 ```bash
 git lfs install
-git clone https://huggingface.co/muscgab/mangaocr-nar-small
-# or: modelscope download --model muscgab/mangaocr-nar-small --local_dir mangaocr-nar-small
-cd mangaocr-nar-small
+git clone https://huggingface.co/muscgab/manga-ocr-nar-small
+# or: modelscope download --model muscgab/manga-ocr-nar-small --local_dir manga-ocr-nar-small
+cd manga-ocr-nar-small
 ```
 
 Install inside the repository directory with one extra for your platform:
@@ -175,7 +178,7 @@ pip install -e ".[mac]"    # Mac (macOS 15+): pyobjc-framework-CoreML, no torch 
 ```
 
 ```python
-from mangaocr_nar_small import MangaOcrNarSmall
+from manga_ocr_nar_small import MangaOcrNarSmall
 ocr = MangaOcrNarSmall()                   # backend="auto": CUDA if available, CoreML on macOS 15+, otherwise ONNX
 ocr("crop.png")                            # one crop -> str
 ocr(["crop1.png", "crop2.png"])            # crops of one page together -> list[str], processed as one batch
@@ -184,7 +187,7 @@ ocr(["crop1.png", "crop2.png"])            # crops of one page together -> list[
 PIL images and uint8 RGB arrays are accepted too. Command line:
 
 ```bash
-mangaocr-nar-small crop1.png crop2.png     # prints "path<TAB>text" per line
+manga-ocr-nar-small crop1.png crop2.png     # prints "path<TAB>text" per line
 ```
 
 **GPU down-clocking (CUDA only)**: the GPU lowers its clock after a few seconds idle, so the next request is slower. On an RTX 2080 Ti the first crop after 20 s idle takes 24.7 ms instead of 7.5 ms; one page at a time takes 53 ms per page with 10 s between pages and 37 ms when processing continuously. To keep top speed, lock the GPU clock at its maximum (needs administrator rights; restore with `nvidia-smi -rgc` afterwards):

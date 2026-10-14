@@ -1,4 +1,4 @@
-"""mangaocr-nar-small network (PyTorch, inference only). Parameter names match model.safetensors.
+"""manga-ocr-nar-small network (PyTorch, inference only). Parameter names match model.safetensors.
 
   encoder   MonkeyOCRv2-S ViT (12 blocks, width 384, 6 heads, SwiGLU 1536, 2D RoPE): patch embedding h0, blocks h1..h11,
             final block + post-norm h12

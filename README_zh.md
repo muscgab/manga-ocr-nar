@@ -2,7 +2,9 @@
 
 [English](README.md) | [中文](README_zh.md)
 
-[GitHub](https://github.com/muscgab/mangaocr-nar-small)（只有代码和说明，不含权重） · [Hugging Face](https://huggingface.co/muscgab/mangaocr-nar-small) · [ModelScope](https://modelscope.cn/models/muscgab/mangaocr-nar-small)
+[GitHub](https://github.com/muscgab/manga-ocr-nar-small)（只有代码和说明，不含权重） · [Hugging Face](https://huggingface.co/muscgab/manga-ocr-nar-small) · [ModelScope](https://modelscope.cn/models/muscgab/manga-ocr-nar-small)
+
+2026-10-14 由 `mangaocr-nar-small` 改名而来。GitHub 和 Hugging Face 的旧链接会自动跳转到这里；ModelScope 旧仓库保留不删。旧的导入名 `mangaocr_nar_small` 和命令 `mangaocr-nar-small` 仍可使用。
 
 日文漫画文字框 OCR 模型。输入一张文字框裁图，一次前向输出整段文字（非自回归），共 54.2M 参数。
 
@@ -146,7 +148,8 @@ $$m_j = b + \gamma_j \odot W_o f_j,\qquad f_j = \sum_{l=0}^{11} \mathrm{softmax}
 | `nar_vocabulary_6817.json` | 词表 | 48 KB |
 | `onnx/` | CPU 用 ONNX | 213 MB |
 | `coreml/` | Mac 用 CoreML | 107 MB |
-| `mangaocr_nar_small/` | 推理代码 | — |
+| `manga_ocr_nar_small/` | 推理代码 | — |
+| `mangaocr_nar_small/` | 旧导入名（上一行的别名） | — |
 | `samples/` | 示例裁图 | 162 KB |
 | `SHA256SUMS` | 校验和 | — |
 
@@ -161,9 +164,9 @@ $$m_j = b + \gamma_j \odot W_o f_j,\qquad f_j = \sum_{l=0}^{11} \mathrm{softmax}
 
 ```bash
 git lfs install
-git clone https://huggingface.co/muscgab/mangaocr-nar-small
-# 或：modelscope download --model muscgab/mangaocr-nar-small --local_dir mangaocr-nar-small
-cd mangaocr-nar-small
+git clone https://huggingface.co/muscgab/manga-ocr-nar-small
+# 或：modelscope download --model muscgab/manga-ocr-nar-small --local_dir manga-ocr-nar-small
+cd manga-ocr-nar-small
 ```
 
 在仓库目录内安装，按平台选一个附加项：
@@ -175,7 +178,7 @@ pip install -e ".[mac]"    # Mac（macOS 15+）：pyobjc-framework-CoreML，不�
 ```
 
 ```python
-from mangaocr_nar_small import MangaOcrNarSmall
+from manga_ocr_nar_small import MangaOcrNarSmall
 ocr = MangaOcrNarSmall()                   # backend="auto"：有 CUDA 用 CUDA，macOS 15+ 用 CoreML，否则 ONNX
 ocr("crop.png")                            # 一张裁图 -> str
 ocr(["crop1.png", "crop2.png"])            # 同一页的裁图一起传入 -> list[str]，作为一个 batch 处理
@@ -184,7 +187,7 @@ ocr(["crop1.png", "crop2.png"])            # 同一页的裁图一起传入 -> l
 也接受 PIL 图像和 uint8 RGB 数组。命令行：
 
 ```bash
-mangaocr-nar-small crop1.png crop2.png     # 每行输出“路径<TAB>文字”
+manga-ocr-nar-small crop1.png crop2.png     # 每行输出“路径<TAB>文字”
 ```
 
 **显卡降频（仅 CUDA）**：显卡空闲几秒后会自动降频，下一次请求会变慢。RTX 2080 Ti 上，空闲 20 s 后第一框由 7.5 ms 变为 24.7 ms；一次一页、页间隔 10 s 时每页 53 ms，连续处理时为 37 ms。想要一直保持最高速度，可以把显卡频率锁定在最高档（需要管理员权限，用完后用 `nvidia-smi -rgc` 恢复）：
