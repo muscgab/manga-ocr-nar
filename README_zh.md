@@ -181,6 +181,7 @@ $$m_j = b + \gamma_j \odot W_o f_j,\qquad f_j = \sum_{l=0}^{11} \mathrm{softmax}
 
 - AnimeText-OCR：[真实漫画裁图](https://huggingface.co/datasets/JustANormalTinkerer/animetext-ocr)，取序列置信度 0.90–0.98 的部分。
 - 合成数据的几项分布参数参照了评测集候选池的汇总统计，统计值公开在评测集仓库的 `docs/pool_stats/`。
+- 合成手写数据的生成方法（素材、随机因素、排版规则、检查、样图）：[docs/synthetic_handwriting_zh.md](docs/synthetic_handwriting_zh.md)。
 
 **manga-ocr-nar-small-distil**
 

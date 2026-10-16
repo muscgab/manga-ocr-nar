@@ -181,6 +181,7 @@ $$m_j = b + \gamma_j \odot W_o f_j,\qquad f_j = \sum_{l=0}^{11} \mathrm{softmax}
 
 - AnimeText-OCR: [real manga crops](https://huggingface.co/datasets/JustANormalTinkerer/animetext-ocr) with sequence confidence 0.90–0.98.
 - Several distribution parameters of the synthetic data were set from aggregate statistics of the benchmark's candidate pool; the statistics are published in `docs/pool_stats/` of the benchmark repository.
+- How the synthetic handwriting is made (assets, random factors, layout rules, checks, samples): [docs/synthetic_handwriting.md](docs/synthetic_handwriting.md).
 
 **manga-ocr-nar-small-distil**
 
