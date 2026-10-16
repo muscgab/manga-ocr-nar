@@ -1,9 +1,10 @@
-"""MangaOCR-Nar-Small: Japanese manga text-box OCR, non-autoregressive.
+"""manga-ocr-nar: Japanese manga text-box OCR, non-autoregressive (manga-ocr-nar-small, manga-ocr-nar-small-distil).
 
     from manga_ocr_nar_small import MangaOcrNarSmall
     ocr = MangaOcrNarSmall()                 # backend "auto" | "cuda" | "onnx" | "coreml"
     ocr("crop.png")                          # one crop -> str
     ocr([crop1, crop2, ...])                 # the crops of one page -> list[str], run as one batch
+    MangaOcrNarSmall(model_dir="manga-ocr-nar-small-distil")    # the distilled model: same API, model chosen by its files
 
 Crops may be file paths, PIL images or uint8 HWC RGB arrays."""
 from __future__ import annotations
@@ -17,20 +18,20 @@ from PIL import Image
 
 from .vocab import Vocab
 
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 __all__ = ["MangaOcrNarSmall"]
 DEFAULT_DIR = Path(os.environ.get("MANGA_OCR_NAR_SMALL_DIR") or os.environ.get("MANGAOCR_NAR_SMALL_DIR")  # old name still read
                    or Path(__file__).resolve().parent.parent)
 
 
-def _auto() -> str:
+def _auto(model_dir: Path) -> str:
     try:
         import torch
         if torch.cuda.is_available():
             return "cuda"
     except ImportError:
         pass
-    if platform.system() == "Darwin" and int(platform.mac_ver()[0].split(".")[0] or 0) >= 15:
+    if (model_dir / "coreml").is_dir() and platform.system() == "Darwin" and int(platform.mac_ver()[0].split(".")[0] or 0) >= 15:
         try:
             import CoreML  # noqa: F401
             return "coreml"
@@ -56,7 +57,7 @@ class MangaOcrNarSmall:
             raise FileNotFoundError(f"model files not found in {self.model_dir}; pass model_dir= (the downloaded repository) "
                                     "or set MANGA_OCR_NAR_SMALL_DIR")
         self.vocab = Vocab(self.model_dir / "nar_vocabulary_6817.json")
-        self.backend_name = _auto() if backend == "auto" else backend
+        self.backend_name = _auto(self.model_dir) if backend == "auto" else backend
         if self.backend_name == "cuda":
             from .backends.cuda import CudaBackend
             self.backend = CudaBackend(self.model_dir, **kwargs)

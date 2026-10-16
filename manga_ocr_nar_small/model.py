@@ -1,14 +1,19 @@
-"""manga-ocr-nar-small network (PyTorch, inference only). Parameter names match model.safetensors.
+"""manga-ocr-nar network (PyTorch, inference only), shared by manga-ocr-nar-small and manga-ocr-nar-small-distil. Parameter
+names match model.safetensors; sizes come from config.json ("arch", absent = manga-ocr-nar-small).
 
-  encoder   MonkeyOCRv2-S ViT (12 blocks, width 384, 6 heads, SwiGLU 1536, 2D RoPE): patch embedding h0, blocks h1..h11,
-            final block + post-norm h12
-  memory    gamma fusion: base = Bridge(h12) + Pos(row, col); decoder layer j reads
-            m_j = [null x2 ; base + gamma_j * Wo f_j],  f_j = sum_l softmax(depth_logits_j)_l RMSNorm_l(h_l), l = 0..11
+  encoder   MonkeyOCRv2-S ViT (width 384, 6 heads, SwiGLU 1536, 2D RoPE; 12 blocks, distil 6): patch embedding h0, blocks
+            h1..h(L-1), final block + post-norm hL
+  memory    gamma fusion: base = Bridge(hL) + Pos(row, col); decoder layer j reads
+            m_j = [null x2 ; base + gamma_j * Wo f_j],  f_j = sum_l softmax(depth_logits_j)_l RMSNorm_l(h_l), l = 0..L-1
   decoder   4 non-autoregressive blocks over 65 output slots (self-attention with QK-norm and 1D RoPE on half the head dims,
-            cross-attention to m_j, SwiGLU 2048), per-block pre-norms and residual scales in `cond`; output head tied to `tok`
+            cross-attention to m_j, SwiGLU; width 512 / FFN 2048, distil 384 / 1536), per-block pre-norms and residual scales in
+            `cond`; output head tied to `tok`
 
 The released weights are an exact fp16-safe rescaling of the trained checkpoint; the matching RMSNorm eps values come from
-config.json ("reparam.norm_eps"). `inject`, `loop_emb` and `occ` are training-time parameters that inference does not use."""
+config.json ("reparam.norm_eps"). manga-ocr-nar-small-distil was trained with int8 quantisation: its weights are stored as their
+int8 values (dequantised) and config.json "act_quant" holds the uint8 (scale, zero point) of every quantised Linear input, which
+the network applies (QDQ) to reproduce the int8 model exactly. `inject`, `loop_emb` and `occ` are training-time parameters that
+inference does not use."""
 from __future__ import annotations
 
 import json
@@ -18,8 +23,9 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-SLOTS, D, HEADS, K = 65, 512, 8, 4
-ENC_DIM, ENC_HEADS, ENC_FFN, ENC_LAYERS = 384, 6, 1536, 12
+SLOTS = 65
+ENC_DIM, ENC_HEADS, ENC_FFN = 384, 6, 1536
+SMALL_ARCH = {"enc_layers": 12, "d": 512, "heads": 8, "ffn": 2048, "k": 4}     # manga-ocr-nar-small
 UNUSED = ("inject", "loop_emb", "occ.weight", "occ.bias")
 
 
@@ -41,6 +47,19 @@ class EncRMSNorm(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         y = x.float()
         return (y * torch.rsqrt(y.pow(2).mean(-1, keepdim=True) + self.eps)).type_as(x) * self.weight
+
+
+class QLin(nn.Linear):
+    """nn.Linear whose input passes through a uint8 per-tensor quantiser (quantise -> dequantise in fp32), as in int8 training."""
+    qs: float
+    qz: float
+
+    def forward(self, x: Tensor) -> Tensor:
+        return F.linear(qdq(x, self.qs, self.qz), self.weight, self.bias)
+
+
+def qdq(x: Tensor, s: float, z: float) -> Tensor:
+    return ((torch.round(x.float() / s) + z).clamp(0, 255) - z).mul(s).to(x.dtype)
 
 
 def rotate_half(x: Tensor) -> Tensor:
@@ -92,31 +111,31 @@ class _Rotary(nn.Module):
 
 
 class _Vit(nn.Module):
-    def __init__(self):
+    def __init__(self, layers: int):
         super().__init__()
         self.patch_embed = _PatchEmbed()
         self.rotary_pos_emb = _Rotary(ENC_DIM // ENC_HEADS // 2)
-        self.blocks = nn.ModuleList(_VitBlock() for _ in range(ENC_LAYERS))
+        self.blocks = nn.ModuleList(_VitBlock() for _ in range(layers))
         self.post_trunk_norm = EncRMSNorm(ENC_DIM)
 
 
 class _Encoder(nn.Module):
-    def __init__(self):
+    def __init__(self, layers: int):
         super().__init__()
-        self.vit = _Vit()
+        self.vit = _Vit(layers)
 
 
 class Memory(nn.Module):
-    def __init__(self):
+    def __init__(self, D: int, K: int, layers: int):
         super().__init__()
         self.bridge = nn.Sequential(RMSNorm(ENC_DIM), nn.Linear(ENC_DIM, 1024, bias=False), nn.GELU(),
                                     nn.Linear(1024, D, bias=False), RMSNorm(D))
         self.pos = nn.Linear(32, D, bias=False)
         self.null = nn.Parameter(torch.zeros(2, D))
-        self.norms = nn.ModuleList(RMSNorm(ENC_DIM) for _ in range(ENC_LAYERS))
+        self.norms = nn.ModuleList(RMSNorm(ENC_DIM) for _ in range(layers))
         self.wo = nn.Linear(ENC_DIM, D, bias=False)
         self.gamma = nn.Parameter(torch.zeros(K, D))
-        self.depth_logits = nn.Parameter(torch.zeros(K, ENC_LAYERS))
+        self.depth_logits = nn.Parameter(torch.zeros(K, layers))
 
     @staticmethod
     def fourier(rows: Tensor, cols: Tensor, h: Tensor, w: Tensor) -> Tensor:
@@ -127,13 +146,13 @@ class Memory(nn.Module):
 
 
 class Block(nn.Module):
-    def __init__(self):
+    def __init__(self, D: int, HEADS: int, FFN: int):
         super().__init__()
         self.h, self.hd = HEADS, D // HEADS
         self.qkv, self.o1 = nn.Linear(D, 3 * D, bias=False), nn.Linear(D, D, bias=False)
         self.q, self.kv, self.o2 = nn.Linear(D, D, bias=False), nn.Linear(D, 2 * D, bias=False), nn.Linear(D, D, bias=False)
         self.sq, self.sk, self.cq, self.ck = (RMSNorm(self.hd) for _ in range(4))
-        self.gate_up, self.down = nn.Linear(D, 2 * 2048, bias=False), nn.Linear(2048, D, bias=False)
+        self.gate_up, self.down = nn.Linear(D, 2 * FFN, bias=False), nn.Linear(FFN, D, bias=False)
 
     def split(self, x: Tensor) -> Tensor:
         return x.view(x.shape[0], x.shape[1], self.h, self.hd).transpose(1, 2)
@@ -144,7 +163,7 @@ class Block(nn.Module):
 
 
 class Cond(nn.Module):
-    def __init__(self):
+    def __init__(self, D: int):
         super().__init__()
         self.n1, self.n2, self.n3 = RMSNorm(D), RMSNorm(D), RMSNorm(D)
         self.s1, self.s2, self.s3 = (nn.Parameter(torch.ones(D)) for _ in range(3))
@@ -156,12 +175,14 @@ def _rope(t: Tensor, cos: Tensor, sin: Tensor, half: int) -> Tensor:
 
 
 class MangaOcrNarSmallNet(nn.Module):
-    def __init__(self):
+    def __init__(self, arch: dict | None = None):
         super().__init__()
-        self.encoder = _Encoder()
-        self.memory = Memory()
-        self.blocks = nn.ModuleList(Block() for _ in range(K))
-        self.cond = nn.ModuleList(Cond() for _ in range(K))
+        a = {**SMALL_ARCH, **(arch or {})}
+        D, HEADS, K = a["d"], a["heads"], a["k"]
+        self.encoder = _Encoder(a["enc_layers"])
+        self.memory = Memory(D, K, a["enc_layers"])
+        self.blocks = nn.ModuleList(Block(D, HEADS, a["ffn"]) for _ in range(K))
+        self.cond = nn.ModuleList(Cond(D) for _ in range(K))
         self.final_norms = nn.ModuleList([RMSNorm(D)])
         self.slot_pos = nn.Parameter(torch.zeros(SLOTS, D))
         self.tok = nn.Embedding(6819, D)                      # 6,817 characters + end of text + BLANK (input only)
@@ -171,6 +192,7 @@ class MangaOcrNarSmallNet(nn.Module):
         ang = torch.outer(torch.arange(SLOTS).float(), inv)
         self.register_buffer("rope_cos", torch.cat((ang, ang), -1).cos()[None, None], persistent=False)
         self.register_buffer("rope_sin", torch.cat((ang, ang), -1).sin()[None, None], persistent=False)
+        self.head_q = None                                    # (scale, zero point) of the output head's input quantiser (distil)
         self.ready = False
 
     @classmethod
@@ -178,12 +200,18 @@ class MangaOcrNarSmallNet(nn.Module):
         from safetensors.torch import load_file
         model_dir = Path(model_dir)
         cfg = json.loads((model_dir / "config.json").read_text(encoding="utf-8"))
-        net = cls()
+        net = cls(cfg.get("arch"))
         sd = {k: v for k, v in load_file(str(model_dir / "model.safetensors")).items() if k not in UNUSED}
         net.load_state_dict(sd, strict=True)
         mods = dict(net.named_modules())
         for name, eps in cfg["reparam"]["norm_eps"].items():
             mods[name].eps = eps
+        for name, (qs, qz) in (cfg.get("act_quant") or {}).items():
+            if name == "head":
+                net.head_q = (qs, qz)
+            else:
+                mods[name].__class__ = QLin
+                mods[name].qs, mods[name].qz = qs, qz
         net = net.to(device=device, dtype=dtype).eval()
         net.prepare()
         return net
@@ -226,7 +254,11 @@ class MangaOcrNarSmallNet(nn.Module):
             k = (k.float() * cos + rotate_half(k.float()) * sin).to(x.dtype)
             att = F.scaled_dot_product_attention(q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2), attn_mask=mask)
             x = x + blk.attn.proj(att.transpose(1, 2).reshape(B, N, ENC_DIM))
-            g, u = F.linear(blk.norm2(x), w13).split(ENC_FFN, -1)
+            if isinstance(blk.mlp.fc1, QLin):                       # fc1 / fc3 have separate input quantisers
+                xn = blk.norm2(x)
+                g, u = blk.mlp.fc1(xn), blk.mlp.fc3(xn)
+            else:
+                g, u = F.linear(blk.norm2(x), w13).split(ENC_FFN, -1)
             x = x + blk.mlp.fc2(F.silu(g) * u)
             states.append(x)
         states[-1] = vit.post_trunk_norm(x)
@@ -241,7 +273,7 @@ class MangaOcrNarSmallNet(nn.Module):
         km = torch.cat((torch.ones(B, 2, dtype=torch.bool, device=V.device), V), 1)[:, None, None, :]
         s = self.s_after_sa0.expand(B, -1, -1)
         S, Dm = s.shape[1], s.shape[2]
-        for i in range(K):
+        for i in range(len(self.blocks)):
             blk, c = self.blocks[i], self.cond[i]
             if i > 0:
                 q, k, v = blk.qkv(c.n1(s)).chunk(3, -1)
@@ -254,4 +286,7 @@ class MangaOcrNarSmallNet(nn.Module):
             s = s + c.s2 * blk.o2(att.transpose(1, 2).reshape(B, S, Dm))
             g, u = blk.gate_up(c.n3(s)).chunk(2, -1)
             s = s + c.s3 * blk.down(F.silu(g) * u)
-        return (F.linear(self.final_norms[0](s), self.tok.weight[:6818]) + self.bias).argmax(-1)
+        hidden = self.final_norms[0](s)
+        if self.head_q is not None:
+            hidden = qdq(hidden, *self.head_q)
+        return (F.linear(hidden, self.tok.weight[:6818]) + self.bias).argmax(-1)

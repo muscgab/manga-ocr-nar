@@ -3,7 +3,11 @@ the CPU copies the uint8 crops into pinned memory and queues everything without 
 straight into the input buffers of a captured CUDA graph, graph replay, copy of the 65 ids per crop back to pinned memory), then
 sleeps on a blocking event and turns the ids into text. CUDA graphs are captured for batch sizes 1-16, 32 and 48 at start-up; a
 page of b crops runs in the smallest size >= b (extra rows repeat the last crop and are dropped), more than 48 crops are split.
-torch intra-op threads are set to 1 (idle OpenMP threads would otherwise spin)."""
+torch intra-op threads are set to 1 (idle OpenMP threads would otherwise spin).
+
+compile=True wraps the network in torch.compile (inductor, static shapes) before the graphs are captured, which fuses the
+elementwise operations; it needs Triton (Linux) and compiles once per batch size at start-up (about 3 minutes on an RTX 2080 Ti
+for the 18 sizes). Off by default."""
 from __future__ import annotations
 
 import numpy as np
@@ -17,11 +21,16 @@ BUDGET = 324
 
 
 class CudaBackend:
-    def __init__(self, model_dir, device: str = "cuda", fp16: bool = True, buckets=BUCKETS, threads: int = 1):
+    def __init__(self, model_dir, device: str = "cuda", fp16: bool = True, buckets=BUCKETS, threads: int = 1,
+                 compile: bool = False):
         torch.set_num_threads(threads)
         self.dev = torch.device(device)
         self.dt = torch.float16 if fp16 else torch.float32
         self.net = MangaOcrNarSmallNet.load(model_dir, self.dev, self.dt)
+        if compile:
+            import torch._dynamo as dynamo
+            dynamo.config.cache_size_limit = max(dynamo.config.cache_size_limit, 2 * len(buckets) + 8)
+            self.net.forward = torch.compile(self.net.forward, dynamic=False)
         self.pre = GpuPreprocess(BUDGET, device=str(self.dev))
         self.buckets = tuple(sorted(buckets))
         self.pool = torch.cuda.graph_pool_handle()
