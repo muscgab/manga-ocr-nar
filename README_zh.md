@@ -10,7 +10,7 @@
 | **manga-ocr-nar-small-distil** | 29.8M | 88.83% | [Hugging Face](https://huggingface.co/muscgab/manga-ocr-nar-small-distil) · [ModelScope](https://modelscope.cn/models/muscgab/manga-ocr-nar-small-distil) |
 
 - **manga-ocr-nar-small**：更准，长文本和手写体尤其明显。支持 NVIDIA GPU（PyTorch，CUDA 图）、CPU（ONNX fp32）和 Mac（CoreML）。
-- **manga-ocr-nar-small-distil**：由 manga-ocr-nar-small 蒸馏、以 int8 量化训练，面向 CPU：M1 Pro 上每框 21.0 ms，Xeon Gold 6148 上 37.3 ms（manga-ocr-nar-small 在同一台 Xeon 上用 fp32 为 58.2 ms）。在 NVIDIA GPU 上与 manga-ocr-nar-small 速度相当。支持 NVIDIA GPU（PyTorch，CUDA 图）和 CPU（ONNX int8），没有 CoreML 版。
+- **manga-ocr-nar-small-distil**：由 manga-ocr-nar-small 蒸馏、以 int8 量化训练，面向 CPU：M1 Pro 上每框 21.0 ms，Xeon Gold 6148 上 37.3 ms（manga-ocr-nar-small 在同一台 Xeon 上用 fp32 为 75.4 ms）。在 NVIDIA GPU 上与 manga-ocr-nar-small 速度相当。支持 NVIDIA GPU（PyTorch，CUDA 图）和 CPU（ONNX int8），没有 CoreML 版。
 
 两个模型共用同一份代码（`manga_ocr_nar_small`，1.1.0），用哪个模型取决于加载的目录。成绩均为 [JMangaBench_Read v1.3](https://github.com/muscgab/JMangaBench_Read)（7,789 框）。
 
@@ -134,7 +134,7 @@ RTX 2080 Ti（11 GB），fp16，每个模型绑定 8 个 CPU 核，测法与 JMa
 
 | 模型 | 格式 | 设备 | 每框耗时 | EM % | 同 CUDA 输出 |
 |---|---|---|---|---|---|
-| manga-ocr-nar-small | ONNX，fp32 | Xeon Gold 6148 | 58.2 ms | 91.09 | 7,788 |
+| manga-ocr-nar-small | ONNX，fp32 | Xeon Gold 6148 | 75.4 ms | 91.09 | 7,788 |
 | manga-ocr-nar-small | CoreML，fp16 | M1 Pro GPU | 10.1 ms | 91.05 | 7,778 |
 | manga-ocr-nar-small-distil | ONNX，int8（u8u8） | Xeon Gold 6148 | 37.3 ms | 88.92 | 7,599 |
 | manga-ocr-nar-small-distil | ONNX，int8（u8s8） | M1 Pro CPU | 21.0 ms | 88.91 | 7,579 |

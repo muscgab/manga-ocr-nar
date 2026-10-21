@@ -10,7 +10,7 @@ OCR for Japanese manga text boxes. A model takes one cropped text box and output
 | **manga-ocr-nar-small-distil** | 29.8M | 88.83% | [Hugging Face](https://huggingface.co/muscgab/manga-ocr-nar-small-distil) · [ModelScope](https://modelscope.cn/models/muscgab/manga-ocr-nar-small-distil) |
 
 - **manga-ocr-nar-small**: the more accurate model, especially on long and handwritten text. NVIDIA GPU (PyTorch, CUDA graphs), CPU (ONNX fp32) and Mac (CoreML).
-- **manga-ocr-nar-small-distil**: distilled from manga-ocr-nar-small and trained with int8 quantization, for CPUs: 21.0 ms per crop on an M1 Pro and 37.3 ms on a Xeon Gold 6148 (manga-ocr-nar-small: 58.2 ms in fp32 on the same Xeon). On an NVIDIA GPU it is about as fast as manga-ocr-nar-small. NVIDIA GPU (PyTorch, CUDA graphs) and CPU (ONNX int8); no CoreML.
+- **manga-ocr-nar-small-distil**: distilled from manga-ocr-nar-small and trained with int8 quantization, for CPUs: 21.0 ms per crop on an M1 Pro and 37.3 ms on a Xeon Gold 6148 (manga-ocr-nar-small: 75.4 ms in fp32 on the same Xeon). On an NVIDIA GPU it is about as fast as manga-ocr-nar-small. NVIDIA GPU (PyTorch, CUDA graphs) and CPU (ONNX int8); no CoreML.
 
 Both use the same code (`manga_ocr_nar_small`, 1.1.0); the model is chosen by the directory you load. Scores: [JMangaBench_Read v1.3](https://github.com/muscgab/JMangaBench_Read), 7,789 boxes.
 
@@ -134,7 +134,7 @@ End to end, preprocessing included:
 
 | Model | Format | Device | Time per crop | EM % | Same as CUDA |
 |---|---|---|---|---|---|
-| manga-ocr-nar-small | ONNX, fp32 | Xeon Gold 6148 | 58.2 ms | 91.09 | 7,788 |
+| manga-ocr-nar-small | ONNX, fp32 | Xeon Gold 6148 | 75.4 ms | 91.09 | 7,788 |
 | manga-ocr-nar-small | CoreML, fp16 | M1 Pro GPU | 10.1 ms | 91.05 | 7,778 |
 | manga-ocr-nar-small-distil | ONNX, int8 (u8u8) | Xeon Gold 6148 | 37.3 ms | 88.92 | 7,599 |
 | manga-ocr-nar-small-distil | ONNX, int8 (u8s8) | M1 Pro CPU | 21.0 ms | 88.91 | 7,579 |
